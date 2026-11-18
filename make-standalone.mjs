@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const dataUrl=file=>{const ext=path.extname(file),mime={'.otf':'font/otf','.ttf':'font/ttf','.svg':'image/svg+xml','.png':'image/png'}[ext]||'application/octet-stream';return`data:${mime};base64,${fs.readFileSync(file).toString('base64')}`;};
+let html=fs.readFileSync('dist/index.html','utf8');
+let styles=fs.readFileSync('dist/styles.css','utf8');
+styles=styles.replace(/url\(['"]?(\.\/[^'"\)]+)['"]?\)/g,(all,relative)=>{const file=path.join('dist',relative);return fs.existsSync(file)?`url('${dataUrl(file)}')`:all;});
+const model=fs.readFileSync('dist/model.mjs','utf8').replace(/^export /gm,'');
+const artwork=Object.fromEntries(fs.readdirSync('dist/assets').map(name=>[name,dataUrl('dist/assets/'+name)]));
+let galaxy=fs.readFileSync('dist/galaxy.mjs','utf8').replace(/^export /gm,'').replace(/^import .+\n/gm,'');
+const dataset=fs.readFileSync('dist/data.json','utf8').replace(/</g,'\\u003c');
+let app=fs.readFileSync('dist/app.js','utf8').replace(/^import .+\n/gm,'');
+app=app.replace("const response=await fetch('./data.json');",()=>`const response={ok:true,json:async()=>(${dataset})};`);
+html=html.replace('<link rel="stylesheet" href="styles.css?v=20261117-resume4">',()=>`<style>${styles}</style>`).replace(/src="(assets\/[^\"]+)"/g,(_,src)=>`src="${dataUrl('dist/'+src)}"`).replace('href="favicon.svg"',()=>`href="${dataUrl('dist/favicon.svg')}"`).replace('<script type="module" src="app.js?v=20261117-resume4"></script>',()=>`<script type="module">const embeddedArtwork=${JSON.stringify(artwork)};\n${model}\n${galaxy}\n${app}</script>`);
+fs.writeFileSync('Orbit-Network-Atlas.html',html);console.log('Created standalone Network Atlas: '+Buffer.byteLength(html)+' bytes; fonts, artwork and network data embedded.');
